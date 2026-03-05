@@ -321,7 +321,7 @@ json format_response_rerank(
         const std::string & model_name,
         const json & ranks,
         bool is_tei_format,
-        std::vector<std::string> & texts,
+        std::vector<json> & texts,
         int top_n);
 
 //
@@ -371,4 +371,4 @@ server_tokens format_prompt_rerank(
         const struct llama_vocab * vocab,
         mtmd_context * mctx,
         const std::string & query,
-        const std::string & doc);
+        const json & doc);

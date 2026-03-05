@@ -3889,10 +3889,9 @@ void server_routes::init_routes() {
             return res;
         }
 
-        std::vector<std::string> documents = json_value(body, "documents",
-                                             json_value(body, "texts", std::vector<std::string>()));
+        std::vector<json> documents = json_value(body, "documents", std::vector<json>());
         if (documents.empty()) {
-            res->error(format_error_response("\"documents\" must be a non-empty string array", ERROR_TYPE_INVALID_REQUEST));
+            res->error(format_error_response("\"documents\" must be a non-empty array", ERROR_TYPE_INVALID_REQUEST));
             return res;
         }
 

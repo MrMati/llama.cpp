@@ -333,7 +333,7 @@ const mtmd::input_chunk_ptr & server_tokens::find_chunk(size_t idx) const {
 }
 
 void server_tokens::push_back(llama_token tok) {
-    if (tok == LLAMA_TOKEN_NULL) {
+    if (tok == LLAMA_TOKEN_NULL && !has_mtmd) {
         throw std::runtime_error("Invalid token");
     }
     tokens.emplace_back(tok);
@@ -370,7 +370,7 @@ void server_tokens::push_back(server_tokens & tokens) {
         // Assert if we are copying MTMD chunks to a server_tokens that does not have mtmd.
         // We could also just check, but this will prevent silently dropping MTMD data.
         GGML_ASSERT(has_mtmd);
-        for (auto it = tokens.map_idx_to_media.begin(); it != tokens.map_idx_to_media.end(); ) {
+        for (auto it = tokens.map_idx_to_media.begin(); it != tokens.map_idx_to_media.end(); ++it) {
             auto * chunk = tokens.map_idx_to_media[it->first].get();
             mtmd::input_chunk_ptr new_chunk(mtmd_input_chunk_copy(chunk));
             map_idx_to_media[start_idx + it->first] = std::move(new_chunk);
@@ -1706,7 +1706,7 @@ json format_response_rerank(
         const std::string & model_name,
         const json & ranks,
         bool is_tei_format,
-        std::vector<std::string> & texts,
+        std::vector<json> & texts,
         int top_n) {
     int32_t n_tokens = 0;
     bool return_text = is_tei_format && json_value(request, "return_text", false);
@@ -1720,7 +1720,7 @@ json format_response_rerank(
         };
         n_tokens += json_value(rank, "tokens_evaluated", 0);
         if (return_text) {
-            elem["text"] = std::move(texts[index]);
+            elem["text"] = std::move(texts[index]["prompt_string"]);
         }
         elements.push_back(elem);
     }
@@ -2033,7 +2033,7 @@ server_tokens format_prompt_rerank(
         const struct llama_vocab * vocab,
         mtmd_context * mctx,
         const std::string & query,
-        const std::string & doc) {
+        const json & doc) {
     server_tokens result = {};
 
     const char * rerank_prompt = llama_model_chat_template(model, "rerank");
@@ -2048,6 +2048,10 @@ server_tokens format_prompt_rerank(
         // Get EOS token - use SEP token as fallback if EOS is not available
         server_tokens query_tokens = tokenize_input_subprompt(vocab, mctx, query, false, false);
         server_tokens doc_tokens   = tokenize_input_subprompt(vocab, mctx, doc,   false, false);
+        if (doc_tokens.has_mtmd) {
+            result.has_mtmd = true;
+            query_tokens.has_mtmd = true;
+        }
         llama_token eos_token = llama_vocab_eos(vocab);
         if (eos_token == LLAMA_TOKEN_NULL) {
             eos_token = llama_vocab_sep(vocab);
