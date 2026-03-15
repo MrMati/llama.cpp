@@ -2040,10 +2040,26 @@ server_tokens format_prompt_rerank(
 
     if (rerank_prompt != nullptr) {
         std::string prompt = rerank_prompt;
-        string_replace_all(prompt, "{query}"   , query);
-        string_replace_all(prompt, "{document}", doc  );
-        server_tokens tokens = tokenize_input_subprompt(vocab, mctx, prompt, false, true);
-        result.push_back(tokens);
+        string_replace_all(prompt, "{query}", query);
+
+        const std::string marker = "{document}";
+        size_t pos = prompt.find(marker);
+
+        std::string before = prompt.substr(0, pos);
+        std::string after  = prompt.substr(pos + marker.size());
+
+        server_tokens before_tokens = tokenize_input_subprompt(vocab, mctx, before, false, true);
+        server_tokens doc_tokens    = tokenize_input_subprompt(vocab, mctx, doc, false, false);
+        server_tokens after_tokens  = tokenize_input_subprompt(vocab, mctx, after, false, true);
+        if (doc_tokens.has_mtmd) {
+            result.has_mtmd = true;
+            before_tokens.has_mtmd = true;
+            after_tokens.has_mtmd = true;
+        }
+
+        result.push_back(before_tokens);
+        result.push_back(doc_tokens);
+        result.push_back(after_tokens);
     } else {
         // Get EOS token - use SEP token as fallback if EOS is not available
         server_tokens query_tokens = tokenize_input_subprompt(vocab, mctx, query, false, false);
